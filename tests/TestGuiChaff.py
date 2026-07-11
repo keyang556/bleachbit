@@ -130,6 +130,20 @@ class GuiChaffTestCase(common.BleachbitTestCase):
             self.dialog.choose_folder_button.get_filename(),
             tempfile.gettempdir())
 
+    def test_form_controls_have_accessible_names(self):
+        """Every chaff form control is named for screen readers."""
+        expected_names = (
+            (self.dialog.inspiration_combo, 'Inspiration'),
+            (self.dialog.stop_mode_combo, 'Stop after'),
+            (self.dialog.stop_value_spin, 'Number of files'),
+            (self.dialog.choose_folder_button, 'Select destination folder'),
+            (self.dialog.when_finished_combo, 'When finished'),
+            (self.dialog.progressbar, 'Progress'),
+        )
+        for widget, expected in expected_names:
+            with self.subTest(expected=expected):
+                self.assertEqual(expected, widget.get_accessible().get_name())
+
     def test_combo_options(self):
         """Test that combo box has correct options"""
         expected_options = ('2600 Magazine', "Hillary Clinton's emails")
@@ -183,6 +197,8 @@ class GuiChaffTestCase(common.BleachbitTestCase):
         self.dialog.stop_mode_combo.set_active(STOP_MODE_TOTAL_SIZE)
         self.refresh_gui()
         self.assertIn('MB', self.dialog.stop_value_label.get_text())
+        self.assertEqual(self.dialog.stop_value_label.get_text(),
+                         self.dialog.stop_value_spin.get_accessible().get_name())
 
         self.dialog.stop_mode_combo.set_active(STOP_MODE_FREE_SPACE)
         self.refresh_gui()

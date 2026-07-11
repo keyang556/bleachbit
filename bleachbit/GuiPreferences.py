@@ -31,6 +31,8 @@ import os
 from bleachbit import GuiBasic
 from bleachbit import online_update_notification_enabled
 from bleachbit import ProtectedPath
+from bleachbit.Accessibility import (announce, label_control,
+                                     set_accessible_name)
 from bleachbit.Constant import EMPTY_SPACE_WARNING, REQUIRES_EXPERT_MODE
 from bleachbit.GtkShim import Gtk, GLib
 from bleachbit.GuiCookie import CookieManagerPane
@@ -106,6 +108,8 @@ class PreferencesDialog:
         sidebar.set_stack(self.page_stack)
         sidebar.set_vexpand(True)
         sidebar.set_margin_end(6)
+        # TRANSLATORS: Accessible name for the preferences page selector.
+        set_accessible_name(sidebar, _("Preferences sections"))
 
         pages = [
             # TRANSLATORS: Sidebar label for the general settings page of the preferences dialog.
@@ -221,6 +225,8 @@ class PreferencesDialog:
         self.infobar_label.set_text(message)
         self.infobar.set_message_type(message_type)
         self.infobar.show_all()
+        announce(self.infobar_label, message,
+                 assertive=message_type == Gtk.MessageType.ERROR)
         self._infobar_timeout_id = GLib.timeout_add_seconds(
             15, self._hide_infobar)
 
@@ -351,6 +357,7 @@ class PreferencesDialog:
         self.lang_select_box.pack_start(lang_label, False, True, 5)
 
         self.lang_combo = Gtk.ComboBoxText()
+        label_control(lang_label, self.lang_combo)
         current_lang_code = get_active_language_code()
         # Add available languages
         lang_idx = 0
@@ -651,6 +658,8 @@ class PreferencesDialog:
         for pathname in pathnames:
             liststore.append([pathname])
         treeview = Gtk.TreeView.new_with_model(liststore)
+        # TRANSLATORS: Accessible name for folders used to wipe empty space.
+        set_accessible_name(treeview, _("Folders for wiping empty space"))
         crt = Gtk.CellRendererText()
         tvc = Gtk.TreeViewColumn(None, crt, text=0)
         treeview.append_column(tvc)
@@ -711,6 +720,9 @@ class PreferencesDialog:
 
         # create treeview
         treeview = Gtk.TreeView.new_with_model(liststore)
+        # TRANSLATORS: Accessible name for the list of languages preserved
+        # during cleaning.
+        set_accessible_name(treeview, _("Languages to keep"))
 
         # create column views
         self.renderer0 = Gtk.CellRendererToggle()
@@ -945,6 +957,13 @@ class PreferencesDialog:
 
         # create treeview
         treeview = Gtk.TreeView.new_with_model(liststore)
+        if LOCATIONS_WHITELIST == page_type:
+            # TRANSLATORS: Accessible name for paths protected from cleaning.
+            tree_name = _("Paths to keep")
+        else:
+            # TRANSLATORS: Accessible name for user-defined cleaning paths.
+            tree_name = _("Custom paths to clean")
+        set_accessible_name(treeview, tree_name)
 
         # create column views
         self.renderer0 = Gtk.CellRendererText()

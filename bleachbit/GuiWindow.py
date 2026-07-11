@@ -12,6 +12,7 @@ import time
 
 import bleachbit
 from bleachbit import APP_NAME, Cleaner, FileUtilities, GuiBasic, appicon_path, windows10_theme_path
+from bleachbit.Accessibility import announce, set_accessible_name
 from bleachbit.Cleaner import backends, register_cleaners
 from bleachbit.Constant import ABORT_BUTTON_LABEL, REQUIRES_EXPERT_MODE
 from bleachbit.GUI import logger
@@ -159,6 +160,8 @@ class GUI(Gtk.ApplicationWindow):
         self.infobar.connect('response', self._on_infobar_response)
         self.infobar_label = Gtk.Label()
         self.infobar_label.set_line_wrap(True)
+        # TRANSLATORS: Accessible name for transient application messages.
+        set_accessible_name(self.infobar_label, _("Notification"))
         self.infobar.get_content_area().add(self.infobar_label)
         vbox.pack_start(self.infobar, False, False, 0)
 
@@ -171,6 +174,8 @@ class GUI(Gtk.ApplicationWindow):
         # create the right side of the window
         right_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.progressbar = Gtk.ProgressBar()
+        # TRANSLATORS: Accessible name for the operation progress indicator.
+        set_accessible_name(self.progressbar, _("Progress"))
         right_box.pack_start(self.progressbar, False, True, 0)
 
         # add output display on right
@@ -181,6 +186,8 @@ class GUI(Gtk.ApplicationWindow):
         self.textview = Gtk.TextView.new_with_buffer(self.textbuffer)
         self.textview.set_editable(False)
         self.textview.set_wrap_mode(Gtk.WrapMode.WORD)
+        # TRANSLATORS: Accessible name for the preview and cleaning output.
+        set_accessible_name(self.textview, _("Results"))
         swindow.add(self.textview)
         right_box.add(swindow)
         hbox.add(right_box)
@@ -213,6 +220,8 @@ class GUI(Gtk.ApplicationWindow):
         self._update_error_tag_color()
 
         self.status_bar = Gtk.Statusbar()
+        # TRANSLATORS: Accessible name for the main window status bar.
+        set_accessible_name(self.status_bar, _("Status"))
         vbox.add(self.status_bar)
         # setup drag&drop
         self.setup_drag_n_drop()
@@ -463,6 +472,8 @@ class GUI(Gtk.ApplicationWindow):
         self.infobar_label.set_text(message)
         self.infobar.set_message_type(message_type)
         self.infobar.show_all()
+        announce(self.infobar_label, message,
+                 assertive=message_type == Gtk.MessageType.ERROR)
         self._infobar_timeout_id = GLib.timeout_add_seconds(
             15, self._hide_infobar)
 
@@ -747,6 +758,7 @@ class GUI(Gtk.ApplicationWindow):
             self.progressbar.set_text("")
             self.progressbar.set_fraction(1)
             self.progressbar.set_text(done_msg)
+            announce(self.progressbar, done_msg)
         if self.textbuffer is not None:
             self.textview.scroll_mark_onscreen(
                 self.textbuffer.get_insert())
@@ -779,6 +791,7 @@ class GUI(Gtk.ApplicationWindow):
         mdl = self.tree_store.get_model()
         self.view = display.make_view(
             mdl, self, self.context_menu_event)
+        self.view.connect('popup-menu', self.context_menu_keyboard_event)
         self.view.get_selection().connect("changed", self.on_selection_changed)
         scrollbar_width = scrolled_window.get_vscrollbar().get_preferred_width()[
             1]
@@ -881,7 +894,7 @@ class GUI(Gtk.ApplicationWindow):
         return False
 
     def context_menu_event(self, treeview, event):
-        """When user right clicks on the tree view"""
+        """Open the selected option's context menu after a right click."""
         if event.button != 3:
             return False
         pathinfo = treeview.get_path_at_pos(int(event.x), int(event.y))
@@ -890,6 +903,19 @@ class GUI(Gtk.ApplicationWindow):
         path, col, _cellx, _celly = pathinfo
         treeview.grab_focus()
         treeview.set_cursor(path, col, 0)
+        return self._show_tree_context_menu(
+            treeview, path, event.button, event.time)
+
+    def context_menu_keyboard_event(self, treeview):
+        """Open the selected option's context menu from Menu or Shift+F10."""
+        path, _column = treeview.get_cursor()
+        if path is None:
+            return False
+        return self._show_tree_context_menu(
+            treeview, path, 0, Gtk.get_current_event_time())
+
+    def _show_tree_context_menu(self, treeview, path, button, event_time):
+        """Create and display the context menu for a child cleaner row."""
         # context menu applies only to children, not parents
         if len(path) != 2:
             return False
@@ -929,7 +955,7 @@ class GUI(Gtk.ApplicationWindow):
         # show the context menu
         menu.attach_to_widget(treeview)
         menu.show_all()
-        menu.popup(None, None, None, None, event.button, event.time)
+        menu.popup(None, None, None, None, button, event_time)
         return True
 
     def setup_drag_n_drop(self):
@@ -970,6 +996,7 @@ class GUI(Gtk.ApplicationWindow):
         elif isinstance(status, str):
             self.progressbar.set_show_text(True)
             self.progressbar.set_text(status)
+            set_accessible_name(self.progressbar, status)
         else:
             raise RuntimeError('unexpected type: ' + str(type(status)))
 
@@ -1023,6 +1050,8 @@ class GUI(Gtk.ApplicationWindow):
             # 'Preview' is a verb, and 'selected operations' refers to
             # the cleaning options (e.g., Firefox - Cache).
             _("Preview files in the selected operations (without deleting any files)"))
+        set_accessible_name(self.preview_button, PREVIEW_MSG,
+                            self.preview_button.get_tooltip_text())
 
         # Clean button
         self.run_button.set_label(CLEAN_MSG)
@@ -1031,12 +1060,16 @@ class GUI(Gtk.ApplicationWindow):
             # 'Clean' is a verb, and 'operations' are cleaning options (e.g.,
             #  Firefox - Cache).
             _("Clean files in the selected operations"))
+        set_accessible_name(self.run_button, CLEAN_MSG,
+                            self.run_button.get_tooltip_text())
 
         self.stop_button.set_label(ABORT_BUTTON_LABEL)
         self.stop_button.set_tooltip_text(
             # TRANSLATORS: Tooltip for the abort button on the headerbar,
             # and 'abort' ia a verb.
             _('Abort the preview or cleaning process'))
+        set_accessible_name(self.stop_button, ABORT_BUTTON_LABEL,
+                            self.stop_button.get_tooltip_text())
 
     def on_update_button_clicked(self, _widget):
         """Callback when the update button on the headerbar is clicked"""
@@ -1130,12 +1163,19 @@ class GUI(Gtk.ApplicationWindow):
 
         hbar.pack_start(box)
 
+        # Set text and accessibility metadata before the platform-specific
+        # return below.  In particular, Windows otherwise starts with three
+        # unnamed icon-only buttons until the cleaner refresh finishes.
+        self.update_headerbar_labels()
+
         # Add hamburger menu on the right.
         # This is not needed for Microsoft Windows because other code places its
         # menu on the left side.
         if os.name == 'nt':
             return hbar
         menu_button = Gtk.MenuButton()
+        # TRANSLATORS: Accessible name for the header bar menu button.
+        set_accessible_name(menu_button, _("Main menu"))
         icon = Gio.ThemedIcon(name="open-menu-symbolic")
         image = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.BUTTON)
         builder = Gtk.Builder()
@@ -1148,8 +1188,6 @@ class GUI(Gtk.ApplicationWindow):
         else:
             hbar.pack_end(Gtk.Label('error: app-menu.ui not found'))
 
-        # Update all labels and tooltips
-        self.update_headerbar_labels()
         return hbar
 
     def on_configure_event(self, _widget, _event):

@@ -5,9 +5,10 @@
 # later.  See the COPYING file in the top-level directory.
 
 from bleachbit import GuiBasic
+from bleachbit.Accessibility import set_accessible_name
 from bleachbit.Cleaner import backends
 from bleachbit.GUI import logger
-from bleachbit.GtkShim import GObject, Gtk
+from bleachbit.GtkShim import Gdk, GObject, Gtk
 from bleachbit.Language import get_text as _
 from bleachbit.Options import options
 
@@ -18,6 +19,8 @@ class TreeDisplayModel:
     def make_view(self, model, parent, context_menu_event):
         """Create and return a TreeView object"""
         self.view = Gtk.TreeView.new_with_model(model)
+        # TRANSLATORS: Accessible name for the tree of cleaning options.
+        set_accessible_name(self.view, _("Cleaning operations"))
 
         # hide headers
         # These commits disabled the header: 5d0b5b7ab,49ad443.
@@ -25,6 +28,8 @@ class TreeDisplayModel:
 
         # listen for right click (context menu)
         self.view.connect("button_press_event", context_menu_event)
+        self.view.connect("key-press-event", self.key_press_event,
+                          model, parent)
 
         # first column: cleaner name
         renderer_name = Gtk.CellRendererText()
@@ -37,7 +42,8 @@ class TreeDisplayModel:
 
         # second column: alert icon
         renderer_alert = Gtk.CellRendererPixbuf()
-        column_alert = Gtk.TreeViewColumn("", renderer_alert)
+        # TRANSLATORS: Accessible column header for protected-option warnings.
+        column_alert = Gtk.TreeViewColumn(_("Warning"), renderer_alert)
         column_alert.add_attribute(renderer_alert, "icon-name", 4)
         self.view.append_column(column_alert)
 
@@ -65,6 +71,20 @@ class TreeDisplayModel:
         # finish
         self.view.expand_all()
         return self.view
+
+    def key_press_event(self, treeview, event, model, parent_window):
+        """Toggle the focused cleaner with Space, regardless of active column."""
+        if event.keyval != Gdk.KEY_space:
+            return False
+        disallowed_modifiers = (Gdk.ModifierType.CONTROL_MASK |
+                                Gdk.ModifierType.MOD1_MASK)
+        if event.state & disallowed_modifiers:
+            return False
+        path, _column = treeview.get_cursor()
+        if path is None:
+            return False
+        self.col1_toggled_cb(None, path.to_string(), model, parent_window)
+        return True
 
     def set_cleaner(self, path, model, parent_window, value):
         """Activate or deactivate option of cleaner."""

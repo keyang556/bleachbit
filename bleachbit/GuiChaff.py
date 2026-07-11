@@ -17,6 +17,8 @@ import threading
 
 
 from bleachbit.Chaff import generate_emails, generate_2600
+from bleachbit.Accessibility import (announce, label_control,
+                                     set_accessible_name)
 from bleachbit.Constant import ABORT_BUTTON_LABEL
 from bleachbit.GtkShim import Gtk, GLib
 from bleachbit.Language import get_text as _
@@ -230,6 +232,8 @@ class ChaffDialog(Gtk.Dialog):
         self.infobar.connect('response', self._on_infobar_response)
         self.infobar_label = Gtk.Label()
         self.infobar_label.set_line_wrap(True)
+        # TRANSLATORS: Accessible name for transient dialog messages.
+        set_accessible_name(self.infobar_label, _("Notification"))
         self.infobar.get_content_area().add(self.infobar_label)
         box.pack_start(self.infobar, False, False, 0)
         self._infobar_timeout_id = None
@@ -253,6 +257,7 @@ class ChaffDialog(Gtk.Dialog):
         inspiration_label.set_xalign(0)
         grid.attach(inspiration_label, 0, 0, 1, 1)
         self.inspiration_combo = Gtk.ComboBoxText()
+        label_control(inspiration_label, self.inspiration_combo)
         self.inspiration_combo.set_hexpand(True)
         self.inspiration_combo_options = (
             _('2600 Magazine'), _("Hillary Clinton's emails"))
@@ -267,6 +272,7 @@ class ChaffDialog(Gtk.Dialog):
         stop_after_label.set_xalign(0)
         grid.attach(stop_after_label, 0, 1, 1, 1)
         self.stop_mode_combo = Gtk.ComboBoxText()
+        label_control(stop_after_label, self.stop_mode_combo)
         self.stop_mode_combo.set_hexpand(True)
         for mode in (STOP_MODE_FILE_COUNT, STOP_MODE_TOTAL_SIZE, STOP_MODE_FREE_SPACE):
             self.stop_mode_combo.append_text(STOP_MODE_LABELS[mode])
@@ -292,6 +298,7 @@ class ChaffDialog(Gtk.Dialog):
         }
         self.stop_value_spin = Gtk.SpinButton(
             adjustment=self._stop_value_adjustments[STOP_MODE_FILE_COUNT])
+        label_control(self.stop_value_label, self.stop_value_spin)
         self.stop_value_spin.set_hexpand(True)
         grid.attach(self.stop_value_spin, 1, 2, 1, 1)
 
@@ -303,6 +310,7 @@ class ChaffDialog(Gtk.Dialog):
         # message "No GSettings schemas".
         # https://github.com/bleachbit/bleachbit/issues/1780
         self.choose_folder_button = Gtk.FileChooserButton()
+        label_control(folder_label, self.choose_folder_button)
         self.choose_folder_button.set_action(
             Gtk.FileChooserAction.SELECT_FOLDER)
         self.choose_folder_button.set_filename(tempfile.gettempdir())
@@ -315,6 +323,7 @@ class ChaffDialog(Gtk.Dialog):
         finished_label.set_xalign(0)
         grid.attach(finished_label, 0, 4, 1, 1)
         self.when_finished_combo = Gtk.ComboBoxText()
+        label_control(finished_label, self.when_finished_combo)
         self.when_finished_combo.set_hexpand(True)
         self.combo_options = (
             # TRANSLATORS: Option in combo box to delete generated chaff
@@ -362,6 +371,8 @@ class ChaffDialog(Gtk.Dialog):
         self._download_spinner_box.hide()
 
         self.progressbar = Gtk.ProgressBar()
+        # TRANSLATORS: Accessible name for chaff-generation progress.
+        set_accessible_name(self.progressbar, _("Progress"))
         box.pack_start(self.progressbar, False, False, 0)
         self.progressbar.hide()
 
@@ -391,6 +402,7 @@ class ChaffDialog(Gtk.Dialog):
         """Update the value spin button when the stop mode changes"""
         mode = combo.get_active()
         self.stop_value_label.set_text(STOP_MODE_LABELS[mode])
+        set_accessible_name(self.stop_value_spin, STOP_MODE_LABELS[mode])
         self.stop_value_spin.set_adjustment(
             self._stop_value_adjustments[mode])
 
@@ -419,6 +431,8 @@ class ChaffDialog(Gtk.Dialog):
         self.infobar_label.set_text(message)
         self.infobar.set_message_type(message_type)
         self.infobar.show_all()
+        announce(self.infobar_label, message,
+                 assertive=message_type == Gtk.MessageType.ERROR)
         self._infobar_timeout_id = GLib.timeout_add_seconds(
             15, self._hide_infobar)
 
@@ -508,6 +522,7 @@ class ChaffDialog(Gtk.Dialog):
             """Update progress bar from GLib main loop"""
             if msg:
                 self.progressbar.set_text(msg)
+                set_accessible_name(self.progressbar, msg)
             self.progressbar.set_fraction(fraction)
             if is_done:
                 self.progressbar.hide()
@@ -541,6 +556,7 @@ class ChaffDialog(Gtk.Dialog):
         logger.info(msg)
         self.progressbar.show()
         self.progressbar.set_text(msg)
+        announce(self.progressbar, msg)
         self.progressbar.set_show_text(True)
         self.progressbar.set_fraction(0.0)
         self.make_button.set_sensitive(False)

@@ -12,10 +12,11 @@ import threading
 import time
 
 # third party
-from bleachbit.GtkShim import GLib, Gtk
+from bleachbit.GtkShim import Gdk, GLib, Gtk
 
 # local import
 import bleachbit
+from bleachbit.Accessibility import announce, label_control, set_accessible_name
 from bleachbit.Constant import URL_COOKIE_MGR
 from bleachbit.Cookie import list_unique_cookies, load_keep_list, COOKIE_KEEP_LIST_FILENAME
 from bleachbit.GuiBasic import open_url
@@ -72,6 +73,7 @@ class CookieManagerPane(Gtk.Box):
         search_box.pack_start(search_label, False, False, 0)
 
         self.search_entry = Gtk.Entry()
+        label_control(search_label, self.search_entry)
         # TRANSLATORS: Placeholder text in the search entry in the manage cookies dialog.
         # 'Filter' is a verb meaning to narrow down the list by typing.
         self.search_entry.set_placeholder_text(_("Filter cookies..."))
@@ -110,11 +112,15 @@ class CookieManagerPane(Gtk.Box):
 
         # Create the TreeView
         self.treeview = Gtk.TreeView(model=self.cookie_filter)
+        # TRANSLATORS: Accessible name for the list of cookies that can be kept.
+        set_accessible_name(self.treeview, _("Cookies to keep"))
+        self.treeview.connect("key-press-event", self.on_tree_key_press)
 
         # Create columns
         renderer_toggle = Gtk.CellRendererToggle()
         renderer_toggle.connect("toggled", self.on_cell_toggled)
-        column_toggle = Gtk.TreeViewColumn("", renderer_toggle, active=0)
+        # TRANSLATORS: Accessible column header for whether a cookie is kept.
+        column_toggle = Gtk.TreeViewColumn(_("Keep"), renderer_toggle, active=0)
         self.treeview.append_column(column_toggle)
 
         renderer_text = Gtk.CellRendererText()
@@ -169,25 +175,27 @@ class CookieManagerPane(Gtk.Box):
                          self.keep_list_path, exc)
             return False
 
-    def update_stat_label(self):
-        """Update the stat label: how many selected"""
+    def update_stat_label(self, announce_change=False):
+        """Update and optionally announce how many cookies are selected."""
         total = len(self.cookie_store)
         selected = sum(1 for row in self.cookie_store if row[0])
         visible = sum(1 for _row in self.cookie_filter)
         if visible < total:
             # TRANSLATORS: %(selected)d is the count of selected cookies,
             # %(total)d is the total count, %(visible)d is the visible count
-            self.stat_label.set_text(
-                _n("%(selected)d of %(total)d cookie kept (%(visible)d visible)",
-                   "%(selected)d of %(total)d cookies kept (%(visible)d visible)",
-                   selected) % {'selected': selected, 'total': total, 'visible': visible})
+            text = _n("%(selected)d of %(total)d cookie kept (%(visible)d visible)",
+                      "%(selected)d of %(total)d cookies kept (%(visible)d visible)",
+                      selected) % {'selected': selected, 'total': total, 'visible': visible}
         else:
             # TRANSLATORS: %(selected)d is the count of selected cookies,
             # %(total)d is the total count
-            self.stat_label.set_text(
-                _n("%(selected)d of %(total)d cookie kept",
-                   "%(selected)d of %(total)d cookies kept",
-                   selected) % {'selected': selected, 'total': total})
+            text = _n("%(selected)d of %(total)d cookie kept",
+                      "%(selected)d of %(total)d cookies kept",
+                      selected) % {'selected': selected, 'total': total}
+        self.stat_label.set_text(text)
+        set_accessible_name(self.stat_label, text)
+        if announce_change:
+            announce(self.stat_label, text)
 
     def on_cell_toggled(self, _widget, path):
         """Toggle the checkbox in the child model"""
@@ -200,13 +208,27 @@ class CookieManagerPane(Gtk.Box):
         self.save_changes()
         self.update_stat_label()
 
+    def on_tree_key_press(self, treeview, event):
+        """Toggle the focused cookie with Space from any tree column."""
+        if event.keyval != Gdk.KEY_space:
+            return False
+        disallowed_modifiers = (Gdk.ModifierType.CONTROL_MASK |
+                                Gdk.ModifierType.MOD1_MASK)
+        if event.state & disallowed_modifiers:
+            return False
+        path, _column = treeview.get_cursor()
+        if path is None:
+            return False
+        self.on_cell_toggled(None, path.to_string())
+        return True
+
     def on_select_all_clicked(self, _widget):
         """Select all cookies"""
         if self._is_loading:
             return
         self._set_filtered_selection(True)
         self.save_changes()
-        self.update_stat_label()
+        self.update_stat_label(announce_change=True)
 
     def on_deselect_all_clicked(self, _widget):
         """Deselect all cookies"""
@@ -214,7 +236,7 @@ class CookieManagerPane(Gtk.Box):
             return
         self._set_filtered_selection(False)
         self.save_changes()
-        self.update_stat_label()
+        self.update_stat_label(announce_change=True)
 
     def _set_filtered_selection(self, is_selected):
         """Set selection state only for rows visible in the current filter."""
@@ -289,6 +311,7 @@ class CookieManagerPane(Gtk.Box):
         vbox.reorder_child(spinner_box, vbox.get_children().index(scrolled))
         self._spinner_box = spinner_box
         self.show_all()
+        announce(self._loading_label, self._loading_label.get_text())
 
         def _worker():
             start = time.monotonic()
@@ -324,7 +347,7 @@ class CookieManagerPane(Gtk.Box):
             is_saved = host in self.saved_domains
             self.cookie_store.append([is_saved, host])
 
-        self.update_stat_label()
+        self.update_stat_label(announce_change=True)
         return False
 
     def _iter_selected_domains(self):

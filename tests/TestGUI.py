@@ -211,6 +211,63 @@ class GUITestCase(common.BleachbitTestCase):
         gui.update_progress_bar(1.0)
         gui.update_progress_bar("status")
 
+    def test_main_controls_have_accessible_names(self):
+        """Primary controls expose useful names to screen readers."""
+        gui = self.get_window()
+        gui.update_progress_bar("accessible status")
+        expected_names = (
+            (gui.view, _("Cleaning operations")),
+            (gui.textview, _("Results")),
+            (gui.progressbar, "accessible status"),
+            (gui.status_bar, _("Status")),
+            (gui.preview_button, _("Preview")),
+            (gui.run_button, _("Clean")),
+            (gui.stop_button, _("Abort")),
+        )
+        for widget, expected in expected_names:
+            with self.subTest(expected=expected):
+                self.assertEqual(expected, widget.get_accessible().get_name())
+
+    def test_context_menu_can_open_from_keyboard(self):
+        """Menu/Shift+F10 opens the context menu for the focused row."""
+        gui = self.get_window()
+        path = Gtk.TreePath.new_from_string("0:0")
+        treeview = mock.Mock()
+        treeview.get_cursor.return_value = (path, None)
+        with mock.patch.object(gui, '_show_tree_context_menu',
+                               return_value=True) as show_menu:
+            self.assertTrue(gui.context_menu_keyboard_event(treeview))
+        show_menu.assert_called_once()
+        self.assertIs(treeview, show_menu.call_args.args[0])
+        self.assertEqual(path, show_menu.call_args.args[1])
+        self.assertEqual(0, show_menu.call_args.args[2])
+
+    def test_space_toggles_focused_cleaner_from_any_column(self):
+        """Space operates the checkbox even when the name cell has focus."""
+        gui = self.get_window()
+        display = TreeDisplayModel()
+        path = Gtk.TreePath.new_from_string("0")
+        treeview = mock.Mock()
+        treeview.get_cursor.return_value = (path, None)
+        event = mock.Mock(keyval=Gdk.KEY_space, state=0)
+        with mock.patch.object(display, 'col1_toggled_cb') as toggle:
+            self.assertTrue(display.key_press_event(
+                treeview, event, gui.view.get_model(), gui))
+        toggle.assert_called_once_with(
+            None, "0", gui.view.get_model(), gui)
+
+    def test_modified_space_preserves_tree_selection_shortcuts(self):
+        """Ctrl+Space remains available to GTK's multi-selection handling."""
+        gui = self.get_window()
+        display = TreeDisplayModel()
+        event = mock.Mock(
+            keyval=Gdk.KEY_space,
+            state=Gdk.ModifierType.CONTROL_MASK)
+        with mock.patch.object(display, 'col1_toggled_cb') as toggle:
+            self.assertFalse(display.key_press_event(
+                gui.view, event, gui.view.get_model(), gui))
+        toggle.assert_not_called()
+
     def test_get_font_size_from_name(self):
         """Test get_font_size_from_name()"""
         tests = (("Sans 12", 12),

@@ -39,6 +39,7 @@ def cleaner_change_dialog(changes, parent):
 
     # TODO: move to GuiBasic
     from bleachbit.GtkShim import Gtk, GObject
+    from bleachbit.Accessibility import set_accessible_name
 
     dialog = Gtk.Dialog(title=_("Security warning"),
                         transient_for=parent,
@@ -62,6 +63,8 @@ def cleaner_change_dialog(changes, parent):
     # create tree view
     liststore = Gtk.ListStore(GObject.TYPE_BOOLEAN, GObject.TYPE_STRING)
     treeview = Gtk.TreeView(model=liststore)
+    # TRANSLATORS: Accessible name for changed cleaner definition files.
+    set_accessible_name(treeview, _("Cleaner definition changes"))
 
     renderer0 = Gtk.CellRendererToggle()
     renderer0.set_property('activatable', True)
