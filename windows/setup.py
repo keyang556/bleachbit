@@ -61,12 +61,6 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 logger.info('ROOT_DIR %s', ROOT_DIR)
 sys.path.append(ROOT_DIR)
 
-GTK_DIR = sys.exec_prefix + '\\Lib\\site-packages\\gnome\\'
-if os.path.exists(GTK_DIR):
-    GTK_LIBDIR = GTK_DIR
-else:
-    GTK_LIBDIR = sys.exec_prefix
-    GTK_DIR = os.path.join(GTK_LIBDIR, '..', '..')
 NSIS_EXE = 'C:\\Program Files (x86)\\NSIS\\makensis.exe'
 NSIS_ALT_EXE = 'C:\\Program Files\\NSIS\\makensis.exe'
 SHRED_REGEX_KEY = 'AllFilesystemObjects\\shell\\shred.bleachbit'
@@ -257,15 +251,17 @@ def count_size_improvement(func):
 
 def environment_check():
     """Check the build environment"""
-    logger.info('Checking for 32-bit Python')
+    logger.info('Checking Python architecture')
     bits = 8 * struct.calcsize('P')
-    assert 32 == bits
+    if bits not in (32, 64):
+        raise RuntimeError(f'Unsupported Python architecture: {bits}-bit')
+    logger.info('Building a %d-bit Windows package', bits)
 
     logger.info('Checking for translations')
     assert_exist('locale', 'run "make -C po local" to build translations')
 
-    logger.info('Checking PyGI library')
-    assert_module('gi')
+    logger.info('Checking wxPython library')
+    assert_module('wx')
 
     logger.info('Checking Python win32 library')
     assert_module('win32file')
@@ -320,8 +316,7 @@ def build_py2exe():
         'bundle_files': 3,  # All files copied to dist directory
         'compressed': 1,     # Create compressed archive
         'optimize': 2,       # Extra optimization (like python -OO)
-        'includes': ['gi'],
-        'packages': ['chardet', 'encodings', 'gi', 'gi.overrides', 'plyer'],
+        'packages': ['chardet', 'encodings', 'plyer', 'wx'],
         'excludes': ['pyreadline', 'difflib', 'doctest',
                      'pickle', 'ftplib', 'bleachbit.Unix', 'charset_normalizer',
                      'setuptools', 'tomli', 'wheel', 'backports',
@@ -487,59 +482,13 @@ def build():
 
     os.makedirs(os.path.join('dist', 'share'), exist_ok=True)
 
-    logger.info('Copying GTK helpers')
-    for exe in glob.glob1(GTK_LIBDIR, 'gspawn-win*-helper*.exe'):
-        copy_file(os.path.join(GTK_LIBDIR, exe), os.path.join('dist', exe))
-    for exe in ('fc-cache.exe',):
-        copy_file(os.path.join(GTK_LIBDIR, exe), os.path.join('dist', exe))
-
-    logger.info('Copying GTK files and icon')
-    for d in ('dbus-1', 'fonts', 'gtk-3.0', 'pango'):
-        path = os.path.join(GTK_DIR, 'etc', d)
-        copy_tree(path, os.path.join('dist', 'etc', d))
-    for d in ('gdk-pixbuf-2.0', 'girepository-1.0', 'glade', 'gtk-3.0'):
-        path = os.path.join(GTK_DIR, 'lib', d)
-        copy_tree(path, os.path.join('dist', 'lib', d))
-
-    gtk_share = os.path.join(GTK_LIBDIR, 'share')
-    if os.path.exists(gtk_share):
-        for d in ('icons', 'themes'):
-            path = os.path.join(gtk_share, d)
-            copy_tree(path, os.path.join('dist', 'share', d))
-
-    logger.info('Fixing paths in loaders.cache file')
-    loaders_fn = os.path.join(
-        'dist', 'lib', 'gdk-pixbuf-2.0', '2.10.0', 'loaders.cache')
-    with open(loaders_fn, 'r+', encoding=SetupEncoding) as f:
-        data = f.read()
-        data = re.sub(r'^".*[/\\](.*\.dll)"$',
-                      r'"\1"', data, flags=re.I | re.M)
-        f.seek(0)
-        f.write(data)
-        f.truncate()
-
-    # fonts are not needed https://github.com/bleachbit/bleachbit/issues/863
-    for d in ('icons',):
-        path = os.path.join(GTK_DIR, 'share', d)
-        copy_tree(path, os.path.join('dist', 'share', d))
-    schemas_dir = 'share\\glib-2.0\\schemas'
-    gschemas_compiled_src = os.path.join(
-        GTK_DIR, schemas_dir, 'gschemas.compiled')
-    gschemas_compiled_dst = os.path.join(
-        'dist', schemas_dir, 'gschemas.compiled')
-    copy_file(gschemas_compiled_src, gschemas_compiled_dst)
+    logger.info('Copying application icons')
     copy_file('bleachbit.png', 'dist\\share\\bleachbit.png')
     # bleachbit.ico is used the for pop-up notification.
     copy_file('windows\\bleachbit.ico', 'dist\\share\\bleachbit.ico')
-    for dll in glob.glob1(GTK_LIBDIR, '*.dll'):
-        copy_file(os.path.join(GTK_LIBDIR, dll), 'dist\\' + dll)
 
     # Copy share files
-    copy_file('share\\app-menu.ui', 'dist\\share\\app-menu.ui')
     copy_file('share\\protected_path.xml', 'dist\\share\\protected_path.xml')
-
-    logger.info('Copying themes')
-    copy_tree('themes', 'dist\\themes')
 
     logger.info('Copying CA bundle')
     copy_file(certifi.where(),
@@ -548,15 +497,6 @@ def build():
     dist_locale_dir = r'dist\share\locale'
     shutil.rmtree(dist_locale_dir, ignore_errors=True)
     os.makedirs(dist_locale_dir)
-
-    logger.info('Copying GTK localizations')
-    locale_dir = os.path.join(GTK_DIR, 'share\\locale\\')
-    for f in recursive_glob(locale_dir, ['gtk30.mo']):
-        if not f.startswith(locale_dir):
-            continue
-        rel_f = f[len(locale_dir):]
-        copy_file(f, os.path.join(dist_locale_dir, rel_f))
-    assert_exist(os.path.join(dist_locale_dir, r'es\LC_MESSAGES\gtk30.mo'))
 
     logger.info('Copying BleachBit localizations')
     copy_tree('locale', dist_locale_dir)
@@ -819,12 +759,10 @@ def recompress_library(fast_build):
 def shrink(fast_build):
     """After building, run all the applicable size optimizations"""
     delete_unnecessary()
-    delete_icons()
     clean_translations()
     remove_empty_dirs('dist')
     strip()
     upx(fast_build)
-    clean_dist_locale()
 
     delete_linux_only()
 

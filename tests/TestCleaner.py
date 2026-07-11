@@ -13,6 +13,7 @@ import glob
 import logging
 import os
 import shutil
+from unittest import mock
 from xml.dom.minidom import parseString
 
 import bleachbit
@@ -70,6 +71,20 @@ def register_all_cleaners():
 
 
 class CleanerTestCase(common.BleachbitTestCase):
+
+    @common.skipUnlessWindows
+    def test_clipboard_uses_native_windows_api(self):
+        """Clipboard cleaning must not depend on the GTK event loop."""
+        from bleachbit.Cleaner import System
+
+        cleaner = System()
+        option_ids = [option_id for option_id, _name in cleaner.get_options()]
+        self.assertIn('clipboard', option_ids)
+        commands = list(cleaner.get_commands('clipboard'))
+        self.assertEqual(1, len(commands))
+        with mock.patch('bleachbit.Windows.clear_clipboard') as clear_clipboard:
+            list(commands[0].execute(True))
+        clear_clipboard.assert_called_once_with()
 
     def test_add_action(self):
         """Unit test for Cleaner.add_action()"""

@@ -418,21 +418,15 @@ class CLITestCase(common.BleachbitTestCase):
 
     def test_process_cmd_line_gui(self):
         """Unit test for process_cmd_line() with --gui"""
-        mock_gui_module = MagicMock()
-        mock_app = MagicMock()
-        mock_app.run.return_value = 0
-        mock_gui_module.Bleachbit.return_value = mock_app
-        with patch.dict('sys.modules', {'bleachbit.GuiApplication': mock_gui_module}):
-            with patch.object(bleachbit, 'GuiApplication', mock_gui_module, create=True):
-                with patch('bleachbit.Bootstrap.check_wayland_and_root', return_value=False):
-                    with patch('os.name', 'posix'):
-                        with patch('sys.argv', ['bleachbit', '--gui']):
-                            with self.assertRaises(SystemExit) as cm:
-                                process_cmd_line()
-                            self.assertEqual(cm.exception.code, 0)
-        mock_gui_module.Bleachbit.assert_called_once_with(
+        with patch('bleachbit.GuiLauncher.run_gui', return_value=0) as mock_run_gui:
+            with patch('bleachbit.Bootstrap.check_wayland_and_root', return_value=False):
+                with patch('os.name', 'posix'):
+                    with patch('sys.argv', ['bleachbit', '--gui']):
+                        with self.assertRaises(SystemExit) as cm:
+                            process_cmd_line()
+                        self.assertEqual(cm.exception.code, 0)
+        mock_run_gui.assert_called_once_with(
             uac=False, shred_paths=[], auto_exit=None)
-        mock_app.run.assert_called_once()
 
     def test_process_cmd_line_no_command(self):
         """Unit test for process_cmd_line() with no command"""

@@ -312,6 +312,15 @@ def _init_gtk():
     """Initialize GTK imports. Called once at module load."""
     global HAVE_GTK, _gtk_unavailable_reason
 
+    # The native wx frontend is the Windows default. Avoid initializing a
+    # second GUI toolkit in the same process; the legacy GTK frontend remains
+    # available through the documented migration override.
+    if os.name == 'nt' and \
+            os.environ.get('BLEACHBIT_GUI_TOOLKIT', '').strip().lower() != 'gtk':
+        HAVE_GTK = False
+        _gtk_unavailable_reason = 'native wxPython interface selected on Windows'
+        return
+
     success, reason = _try_import_gtk()
     HAVE_GTK = success
     _gtk_unavailable_reason = reason

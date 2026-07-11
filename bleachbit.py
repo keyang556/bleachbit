@@ -39,11 +39,11 @@ def main():
     from bleachbit.Bootstrap import bootstrap, check_wayland_and_root
     bootstrap()
 
-    # Check for GUI only when needed: this avoids a Gtk warning when
-    # a display is not available.
+    # Check for GUI only when needed. Windows uses native wx controls for
+    # screen-reader accessibility; other platforms continue to use GTK.
     if len(sys.argv) == 1 or '--gui' in sys.argv:
-        from bleachbit.GtkShim import HAVE_GTK
-        have_gui = HAVE_GTK
+        from bleachbit.GuiLauncher import is_gui_available
+        have_gui = is_gui_available()
     else:
         have_gui = False
 
@@ -52,11 +52,9 @@ def main():
     # If Wayland is a problem and no explicit CLI args were provided,
     # then fall back to CLI.
     if 1 == len(sys.argv) and have_gui and not check_wayland_and_root():
-        # Import GUI inside the condition for Linux packagers to
-        # separate GUI into another package.
-        import bleachbit.GuiApplication  # pylint: disable=import-outside-toplevel
-        app = bleachbit.GuiApplication.Bleachbit()
-        sys.exit(app.run(sys.argv))
+        # Import GUI inside the condition so packagers can separate the GUI.
+        from bleachbit.GuiLauncher import run_gui  # pylint: disable=import-outside-toplevel
+        sys.exit(run_gui(argv=sys.argv))
 
     # Either CLI args were provided or no display is available
     import bleachbit.CLI  # pylint: disable=import-outside-toplevel

@@ -73,6 +73,18 @@ def get_gtk_info():
     return info
 
 
+def get_wx_info():
+    """Get version information for the native Windows GUI toolkit."""
+    try:
+        import wx  # pylint: disable=import-outside-toplevel
+    except ImportError:
+        return {}
+    return {
+        'wxPython version': wx.version(),
+        'wxWidgets port': getattr(wx, 'PlatformInfo', ()),
+    }
+
+
 def _get_home_dirs_to_anonymize():
     """Return home directories that should be anonymized."""
     home_dirs = []
@@ -193,6 +205,8 @@ def get_system_information():
         pass
 
     info.update(get_gtk_info())
+    if os.name == 'nt':
+        info.update(get_wx_info())
 
     # Variables defined in __init__.py
     info['local_cleaners_dir'] = bleachbit.local_cleaners_dir

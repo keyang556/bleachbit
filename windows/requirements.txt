@@ -6,4 +6,5 @@ plyer
 py2exe
 pypiwin32
 winshell
+wxPython>=4.2.2,<4.3
 # python-gtk3-install.ps1 has special installation method for PyGObject.

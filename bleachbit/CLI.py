@@ -409,11 +409,10 @@ There is NO WARRANTY, to the extent permitted by law.
         from bleachbit.Bootstrap import check_wayland_and_root
         if check_wayland_and_root():
             sys.exit(1)
-        import bleachbit.GuiApplication
+        from bleachbit.GuiLauncher import run_gui
         enable_uac = os.name == 'nt' and not options.no_uac
-        app = bleachbit.GuiApplication.Bleachbit(
-            uac=enable_uac, shred_paths=args, auto_exit=options.exit)
-        sys.exit(app.run())
+        sys.exit(run_gui(uac=enable_uac, shred_paths=args,
+                         auto_exit=options.exit))
     if options.shred:
         # delete arbitrary files without GUI
         Options.options.set_override('first_start', False)

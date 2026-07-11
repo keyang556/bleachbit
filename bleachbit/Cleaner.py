@@ -241,10 +241,10 @@ class System(Cleaner):
             self.set_warning('updates', updates_warning)
 
         #
-        # options for GTK+
+        # options that require a graphical desktop clipboard
         #
 
-        if HAVE_GTK:
+        if IS_WINDOWS or HAVE_GTK:
             self.add_option('clipboard', _('Clipboard'), _(
                 'The desktop environment\'s clipboard used for copy and paste operations'))
 
@@ -445,11 +445,16 @@ class System(Cleaner):
                 yield p
 
         # clipboard
-        if HAVE_GTK and 'clipboard' == option_id:
+        if (IS_WINDOWS or HAVE_GTK) and 'clipboard' == option_id:
             def func_clear_clipboard():
                 """Command function to clear clipboard"""
-                import bleachbit.GuiUtil
-                bleachbit.GuiUtil.clear_clipboard()
+                if IS_WINDOWS:
+                    # Use Win32 directly. This works without a GTK event loop
+                    # and is safe for the wx worker thread.
+                    Windows.clear_clipboard()
+                else:
+                    import bleachbit.GuiUtil
+                    bleachbit.GuiUtil.clear_clipboard()
                 return 0
             yield Command.Function(None, func_clear_clipboard, _('Clipboard'))
 
