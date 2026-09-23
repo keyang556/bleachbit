@@ -252,6 +252,33 @@ class GUIwxTestCase(common.BleachbitTestCase):
         self.assertEqual([5, 10, 20], [row['size'] for row in owner._rows])
         self.assertEqual(4, owner.results.refresh_count)
 
+    def test_tab_moves_focus_out_of_tree_and_results(self):
+        """Tab is left to standard focus navigation (issue #2344)."""
+        # A page that is not a panel keeps Tab inside the page on Windows.
+        self.assertIsInstance(self.frame.results.GetParent(), wx.Panel)
+
+        def key_event(key_code, has_modifiers=False):
+            evt = mock.Mock()
+            evt.GetKeyCode.return_value = key_code
+            evt.HasModifiers.return_value = has_modifiers
+            return evt
+
+        with mock.patch.object(
+                self.frame.tree, 'HandleAsNavigationKey',
+                return_value=True) as navigate:
+            evt = key_event(wx.WXK_TAB)
+            self.frame._on_tree_char_hook(evt)
+            navigate.assert_called_once_with(evt)
+            evt.Skip.assert_not_called()
+
+            # Other keys, and Ctrl+Tab, keep the DataViewCtrl behavior.
+            for evt in (key_event(wx.WXK_RIGHT),
+                        key_event(wx.WXK_TAB, has_modifiers=True)):
+                navigate.reset_mock()
+                self.frame._on_tree_char_hook(evt)
+                navigate.assert_not_called()
+                evt.Skip.assert_called_once_with()
+
     def test_wx_ui_proxy_batches_callbacks(self):
         """Test WxUIProxy event batching and rescheduling."""
         class Target:
