@@ -304,6 +304,41 @@ class GUIwxTestCase(common.BleachbitTestCase):
         # focus back into the page.
         self.assertEqual([(True, notebook)], seen)
 
+    def _send_context_menu(self, window, pos):
+        """Send ``wx.EVT_CONTEXT_MENU`` from ``window`` at ``pos``."""
+        evt = wx.ContextMenuEvent(
+            wx.wxEVT_CONTEXT_MENU, window.GetId(), pos)
+        evt.SetEventObject(window)
+        window.GetEventHandler().ProcessEvent(evt)
+
+    def test_keyboard_opens_tree_context_menu(self):
+        """Shift+F10 in the cleaner tree opens its menu (issue #2352)."""
+        tree = self.frame.tree
+        with mock.patch.object(tree, 'PopupMenu') as popup:
+            # A mouse click is left to EVT_DATAVIEW_ITEM_CONTEXT_MENU.
+            self._send_context_menu(tree.GetMainWindow(), wx.Point(5, 5))
+            popup.assert_not_called()
+            # Shift+F10 and the Menu key have no position.
+            self._send_context_menu(
+                tree.GetMainWindow(), wx.DefaultPosition)
+            popup.assert_called_once()
+
+    def test_keyboard_opens_results_context_menu(self):
+        """Shift+F10 in the Results list opens its menu (issue #2352)."""
+        results = self.frame.results
+        row = {'path': 'C:\\a.txt', 'cleaner_id': BROWSER1_ID,
+               'option_id': 'cache', 'cleaner_name': 'Browser',
+               'option_name': 'Cache'}
+        with mock.patch.object(results, 'PopupMenu') as popup, \
+                mock.patch.object(
+                    self.frame, '_selected_rows', return_value=[row]):
+            # A mouse click is left to EVT_LIST_ITEM_RIGHT_CLICK.
+            self._send_context_menu(results, wx.Point(5, 5))
+            popup.assert_not_called()
+            # Shift+F10 and the Menu key have no position.
+            self._send_context_menu(results, wx.DefaultPosition)
+            popup.assert_called_once()
+
     def test_wx_ui_proxy_batches_callbacks(self):
         """Test WxUIProxy event batching and rescheduling."""
         class Target:
