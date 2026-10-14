@@ -1627,5 +1627,22 @@ class MainFrame(wx.Frame):
         try:
             if dlg.ShowModal() == wx.ID_OK:
                 dlg.commit()
+            language_changed = dlg.language_changed
         finally:
             dlg.Destroy()
+        if language_changed:
+            self._reload_cleaners()
+
+    def _reload_cleaners(self):
+        """Reload the cleaners so their names use the new language.
+
+        Mirrors ``GuiWindow.GUI.cb_refresh_operations``.  Skipped
+        while cleaners are loading or a preview/clean is running,
+        because registration replaces ``backends``; the restart notice
+        shown by the dialog covers that case.
+        """
+        if self._loader_thread is not None:
+            return
+        if self._worker_thread is not None and self._worker_thread.is_alive():
+            return
+        self._load_cleaners()

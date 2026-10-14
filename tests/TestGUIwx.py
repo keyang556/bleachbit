@@ -463,3 +463,50 @@ class GUIwxTestCase(common.BleachbitTestCase):
                 options.set(key, value)
             options.set_whitelist_paths(saved_whitelist)
             options.set_custom_paths(saved_custom)
+
+    def test_preferences_dialog_selects_interface_language(self):
+        """Test the Languages page saves the interface language."""
+        prefs = self.PreferencesModule
+        langs = {'en_US': 'English', 'es': 'Español', 'zh_TW': '中文'}
+        dialog = None
+        try:
+            options.set('auto_detect_lang', True)
+            options.set('forced_language', '', section='bleachbit')
+            with mock.patch.object(
+                    prefs, 'get_supported_language_code_name_dict',
+                    return_value=langs), \
+                    mock.patch.object(prefs, 'setup_translation') as setup:
+                dialog = prefs.PreferencesDialog(self.frame)
+                panel = next(
+                    child for child in dialog.GetChildren()
+                    if isinstance(child, wx.Notebook)).GetPage(1)
+                self.assertIsInstance(panel, prefs._LanguagesPanel)
+                self.assertFalse(dialog.language_changed)
+                self.assertTrue(panel._cb_auto.GetValue())
+                self.assertFalse(panel._choice.IsEnabled())
+                self.assertEqual(
+                    ['English (en_US)', 'Español (es)', '中文 (zh_TW)'],
+                    panel._choice.GetItems())
+
+                # Turning auto-detect off enables the dropdown.
+                panel._cb_auto.SetValue(False)
+                panel._on_auto_detect(None)
+                self.assertFalse(options.get('auto_detect_lang'))
+                self.assertTrue(panel._choice.IsEnabled())
+                self.assertTrue(dialog.language_changed)
+
+                # Choosing a language forces it.
+                panel._choice.SetSelection(2)
+                panel._on_language(None)
+                self.assertEqual('zh_TW', options.get('forced_language'))
+
+                # Turning auto-detect back on clears the forced language.
+                panel._cb_auto.SetValue(True)
+                panel._on_auto_detect(None)
+                self.assertTrue(options.get('auto_detect_lang'))
+                self.assertEqual('', options.get('forced_language'))
+                self.assertFalse(panel._choice.IsEnabled())
+                self.assertEqual(3, setup.call_count)
+        finally:
+            if dialog is not None:
+                dialog.Destroy()
