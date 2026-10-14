@@ -89,10 +89,7 @@ class _LanguagesPanel(wx.Panel):
             labels.append('%s (%s)' % (native, lang_code)
                           if native else lang_code)
         self._choice = wx.Choice(box, choices=labels)
-        current_lang_code = get_active_language_code()
-        if current_lang_code in self._lang_codes:
-            self._choice.SetSelection(
-                self._lang_codes.index(current_lang_code))
+        self._select_active_language()
         self._choice.Bind(wx.EVT_CHOICE, self._on_language)
 
         lang_row = wx.BoxSizer(wx.HORIZONTAL)
@@ -110,6 +107,15 @@ class _LanguagesPanel(wx.Panel):
         sizer.Add(box_sizer, 0, wx.EXPAND | wx.ALL, 6)
         self.SetSizer(sizer)
 
+    def _select_active_language(self):
+        """Select the language in use now, or nothing if it is not listed."""
+        current_lang_code = get_active_language_code()
+        if current_lang_code in self._lang_codes:
+            self._choice.SetSelection(
+                self._lang_codes.index(current_lang_code))
+        else:
+            self._choice.SetSelection(wx.NOT_FOUND)
+
     def _update_sensitivity(self):
         enabled = not self._cb_auto.GetValue()
         self._lang_label.Enable(enabled)
@@ -120,6 +126,9 @@ class _LanguagesPanel(wx.Panel):
         options.set('auto_detect_lang', is_auto_detect)
         if is_auto_detect:
             options.set('forced_language', '', section='bleachbit')
+        # The active language may have changed (e.g. back to the system
+        # language), so do not leave a stale choice in the dropdown.
+        self._select_active_language()
         self._update_sensitivity()
         self._language_changed()
 

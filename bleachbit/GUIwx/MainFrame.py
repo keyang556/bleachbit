@@ -935,6 +935,10 @@ class MainFrame(wx.Frame):
                 wx.ID_ANY, _('Clean only %s') % label)
             mi_filter_log = menu.Append(
                 wx.ID_ANY, _('Filter log by %s') % label)
+            if self._loader_thread is not None:
+                # See _start_worker: cleaners cannot run while loading.
+                mi_preview_one.Enable(False)
+                mi_clean_one.Enable(False)
             self.Bind(
                 wx.EVT_MENU,
                 lambda _e, c=cid, o=oid:
@@ -1103,6 +1107,12 @@ class MainFrame(wx.Frame):
         if not operations:
             self._no_selection()
             return
+        if self._loader_thread is not None and set(operations) != {'_gui'}:
+            # Registration clears and rebuilds ``backends`` (for example
+            # after a language change), so a cleaner may be missing
+            # until it finishes.  Shredding brings its own ``_gui``
+            # cleaner, and the startup shred runs while loading.
+            return
         self.log.SetValue('')
         self._log_entries = []
         self._log_display_count = 0
@@ -1262,8 +1272,10 @@ class MainFrame(wx.Frame):
         self._tree_model.set_display(op, opid, display)
 
     def worker_done(self, worker, really_delete):
-        self.btn_preview.Enable()
-        self.btn_clean.Enable()
+        if self._loader_thread is None:
+            # Otherwise _on_loader_done enables them.
+            self.btn_preview.Enable()
+            self.btn_clean.Enable()
         self.btn_abort.Disable()
         self.gauge.SetValue(100)
         if worker.is_aborted:

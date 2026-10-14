@@ -131,7 +131,8 @@ the GTK UI, and works the same way:
 - The dropdown lists every language that has a compiled translation
   in `locale_dir`, plus `en` and `en_US`, as *Native name (code)*,
   for example `中文 (zh_TW)` or `United States English (en_US)`.  It
-  starts on the language in use now.
+  shows the language in use now, and is updated when auto-detect is
+  toggled, so it never shows a forced language that no longer applies.
 - Changes are saved immediately, like the GTK UI, so OK and Cancel
   do not affect them.  They use the same `[bleachbit]` options as the
   GTK UI, so the choice carries across both front-ends:
@@ -145,8 +146,12 @@ the GTK UI, and works the same way:
   cleaner and option names use the new language (the main window
   calls `_reload_cleaners`, the counterpart of the GTK
   `cb_refresh_operations`).  The reload is skipped while cleaners are
-  still loading or a preview or clean is running.  Menus, buttons and
-  the rest of the window change language after a restart.
+  still loading or a preview or clean is running.  While cleaners load,
+  `backends` is cleared and rebuilt, so Preview, Clean and the tree's
+  *Preview only* / *Clean only* menu items are unavailable and
+  `_start_worker` refuses to run cleaners; shredding files or folders
+  still works.  Menus, buttons and the rest of the window change
+  language after a restart.
 - The language is applied at startup by
   `bleachbit.Language.setup_translation()`, which reads
   `get_active_language_code()`.  The portable build stores the
